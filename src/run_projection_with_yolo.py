@@ -1,5 +1,4 @@
 from pathlib import Path
-import os
 import pickle
 
 import cv2
@@ -14,11 +13,15 @@ MODEL_PATH = ROOT / "runs" / "detect" / "train5" / "weights" / "best.pt"
 HOMOGRAPHY_PATH = ROOT / "Js_projection_mapping" / "02_homogrphic_transform" / "homographic_tranform.pckl"
 CALIBRATION_PATH = ROOT / "Js_projection_mapping" / "01_intrinsic_calibration" / "calibration" / "ProCamCalibration.pckl"
 
-CAMERA_INDEX = 1  # change to 0/1/2 if needed
-CONFIDENCE = 0.25
+CAMERA_INDEX = 0  # change to 0/1/2 if needed
+CONFIDENCE = 0.025
 USE_CAMERA_CALIBRATION = False
 USE_HOMOGRAPHY = True
 FULLSCREEN_PROJECTOR = False
+LABEL_BORDER_COLOR = (0, 220, 255)
+LABEL_FILL_COLOR = (0, 70, 110)
+LABEL_TEXT_COLOR = (255, 255, 255)
+MIN_BOX_SIZE_FOR_LABEL = 36
 
 
 # -------------------------------------------------
@@ -28,81 +31,69 @@ def warp_image(image, H, output_width, output_height):
     return cv2.warpPerspective(image, H, (output_width, output_height))
 
 
-def create_fire_overlay(width, height):
-    width = max(8, int(width))
-    height = max(8, int(height))
-    overlay = np.zeros((height, width, 4), dtype=np.uint8)
+def fit_text_scale(text, max_width, max_height, thickness):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    for scale in [1.4, 1.2, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4]:
+        (text_w, text_h), baseline = cv2.getTextSize(text, font, scale, thickness)
+        if text_w <= max_width and (text_h + baseline) <= max_height:
+            return scale, text_w, text_h, baseline
+    (text_w, text_h), baseline = cv2.getTextSize(text, font, 0.35, max(1, thickness - 1))
+    return 0.35, text_w, text_h, baseline
 
-    # base flame body
-    cv2.ellipse(
-        overlay,
-        (width // 2, int(height * 0.66)),
-        (max(6, width // 3), max(8, int(height * 0.28))),
-        0,
-        0,
-        360,
-        (0, 90, 255, 180),
-        -1,
+
+def draw_label_above_box(image, x1, y1, x2, y2, text):
+    img_h, img_w = image.shape[:2]
+    box_w = x2 - x1
+    box_h = y2 - y1
+    if box_w < MIN_BOX_SIZE_FOR_LABEL or box_h < MIN_BOX_SIZE_FOR_LABEL:
+        return image
+
+    thickness = 2 if box_w >= 140 else 1
+    max_text_w = max(30, int(box_w * 1.1))
+    max_text_h = max(18, int(box_h * 0.35))
+    scale, text_w, text_h, baseline = fit_text_scale(text, max_text_w, max_text_h, thickness)
+
+    label_w = text_w + 18
+    label_h = text_h + baseline + 16
+    gap = 10
+
+    label_x1 = x1 + max(0, (box_w - label_w) // 2)
+    label_x1 = max(0, min(label_x1, img_w - label_w))
+
+    # preferred position: above the box
+    label_y1 = y1 - label_h - gap
+    if label_y1 < 0:
+        # fallback: just below the top edge inside image, still near the box
+        label_y1 = min(img_h - label_h, y2 + gap)
+    if label_y1 < 0 or label_y1 + label_h > img_h:
+        return image
+
+    label_x2 = label_x1 + label_w
+    label_y2 = label_y1 + label_h
+
+    cv2.rectangle(image, (label_x1, label_y1), (label_x2, label_y2), LABEL_FILL_COLOR, -1)
+    cv2.rectangle(image, (label_x1, label_y1), (label_x2, label_y2), LABEL_BORDER_COLOR, 2)
+
+    # connector line from label to box
+    line_start = (label_x1 + label_w // 2, label_y2)
+    line_end = (x1 + box_w // 2, y1)
+    cv2.line(image, line_start, line_end, LABEL_BORDER_COLOR, 2)
+
+    text_x = label_x1 + max(8, (label_w - text_w) // 2)
+    text_y = label_y1 + max(text_h + 6, (label_h + text_h) // 2 - baseline)
+    text_y = min(text_y, label_y2 - baseline - 4)
+
+    cv2.putText(
+        image,
+        text,
+        (text_x, text_y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        scale,
+        LABEL_TEXT_COLOR,
+        thickness,
+        cv2.LINE_AA,
     )
-    cv2.ellipse(
-        overlay,
-        (width // 2, int(height * 0.55)),
-        (max(5, width // 4), max(7, int(height * 0.22))),
-        0,
-        0,
-        360,
-        (0, 165, 255, 210),
-        -1,
-    )
-    cv2.ellipse(
-        overlay,
-        (width // 2, int(height * 0.45)),
-        (max(4, width // 6), max(5, int(height * 0.14))),
-        0,
-        0,
-        360,
-        (210, 240, 255, 235),
-        -1,
-    )
-
-    # tip of the flame
-    pts = np.array(
-        [
-            [width // 2, max(0, int(height * 0.04))],
-            [int(width * 0.25), int(height * 0.48)],
-            [int(width * 0.75), int(height * 0.48)],
-        ],
-        dtype=np.int32,
-    )
-    cv2.fillConvexPoly(overlay, pts, (40, 200, 255, 170))
-
-    return overlay
-
-
-def alpha_blend_rgba(background_bgr, overlay_rgba, x, y):
-    bg_h, bg_w = background_bgr.shape[:2]
-    ov_h, ov_w = overlay_rgba.shape[:2]
-
-    x0 = max(0, x)
-    y0 = max(0, y)
-    x1 = min(bg_w, x + ov_w)
-    y1 = min(bg_h, y + ov_h)
-
-    if x0 >= x1 or y0 >= y1:
-        return background_bgr
-
-    ov_x0 = x0 - x
-    ov_y0 = y0 - y
-    ov_x1 = ov_x0 + (x1 - x0)
-    ov_y1 = ov_y0 + (y1 - y0)
-
-    roi = background_bgr[y0:y1, x0:x1]
-    overlay_crop = overlay_rgba[ov_y0:ov_y1, ov_x0:ov_x1]
-
-    rgb = overlay_crop[:, :, :3].astype(np.float32)
-    alpha = (overlay_crop[:, :, 3:4].astype(np.float32) / 255.0)
-    roi[:] = ((1.0 - alpha) * roi.astype(np.float32) + alpha * rgb).astype(np.uint8)
-    return background_bgr
+    return image
 
 
 # -------------------------------------------------
@@ -170,25 +161,30 @@ def main():
 
         if result.boxes is not None:
             names = result.names
-            for idx, box in enumerate(result.boxes):
+            for box in result.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls[0].item())
                 conf = float(box.conf[0].item())
                 label = names.get(cls_id, str(cls_id)) if isinstance(names, dict) else names[cls_id]
 
-                box_w = max(1, x2 - x1)
-                box_h = max(1, y2 - y1)
-                overlay = create_fire_overlay(box_w, box_h)
-                alpha_blend_rgba(beamer_image, overlay, x1, y1)
+                x1 = max(0, min(x1, beamer_image.shape[1] - 1))
+                y1 = max(0, min(y1, beamer_image.shape[0] - 1))
+                x2 = max(0, min(x2, beamer_image.shape[1] - 1))
+                y2 = max(0, min(y2, beamer_image.shape[0] - 1))
 
-                cv2.rectangle(beamer_image, (x1, y1), (x2, y2), (0, 180, 255), 2)
+                if x2 <= x1 or y2 <= y1:
+                    continue
+
+                cv2.rectangle(beamer_image, (x1, y1), (x2, y2), LABEL_BORDER_COLOR, 2)
+                draw_label_above_box(beamer_image, x1, y1, x2, y2, label)
+
                 cv2.putText(
-                    beamer_image,
-                    f"{label} {conf:.2f}",
-                    (x1, max(20, y1 - 10)),
+                    annotated,
+                    f"projected: {label} {conf:.2f}",
+                    (x1, max(20, y1 - 12)),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 255),
+                    0.6,
+                    (0, 255, 255),
                     2,
                     cv2.LINE_AA,
                 )
