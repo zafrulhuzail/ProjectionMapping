@@ -6,6 +6,10 @@
 - **CV / Erkennung:** Im `while True`-Loop, **nach** `dewarped_img` (oder anderem gewaehltem Eingangsbild), **vor** `cv2.imshow("Beamer_Window", BeamerImage)`.
 - **Beamer "bearbeiten":** Alles Sichtbare kommt aus **`BeamerImage`** (`np.zeros`, Zeichnungen, Overlays) - KI-Ergebnisse dort einzeichnen bzw. daraus steuern.
 
+**Frage:** Stimmen die Pixel-Koordinaten von Erkennung und Beamer ueberein?
+
+**Antwort:** Ja. YOLO (und jede andere Erkennung) laeuft auf `dewarped_img` — dem bereits gewarpten Bild in Beamer-Koordinaten. Die Koordinaten die YOLO zurueckgibt sind deshalb direkt identisch mit den Beamer-Pixeln. Pixel (300, 200) bei YOLO = Pixel (300, 200) auf dem Beamer. Kein Umrechnen noetig.
+
 **Frage:** Wo und wie werden die ArUco-Marker erkannt — OpenCV oder manuell fuer die Speziellen?
 
 **Antwort:** Erkennung laeuft ueber **OpenCV** (`cv2.aruco`): vorgegebenes Woerterbuch z.B. `DICT_5X5_50`, dann `detectMarkers` auf dem (gewarpten) Graustufenbild. Welche Marker *bedeuten* was (Ecken 0–3, Overlay bei ID 5 usw.), steht **im Code** als feste IDs / Logik — keine separate Trainings-KI, nur Dictionary + Parameter passend zu den gedruckten/generierten Markern halten.
