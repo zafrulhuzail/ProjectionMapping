@@ -8,7 +8,7 @@ import sys
 #------------------------------------------------------------------------------
 # Settings -> please configure
 #------------------------------------------------------------------------------
-bool_fullscreen =True
+bool_fullscreen = False # true for fullscreen, false for windowed
 height = 720
 width = 1280
 

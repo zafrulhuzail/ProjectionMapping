@@ -1,7 +1,7 @@
 import cv2
 
 # Change this if your webcam is not camera 0
-CAMERA_INDEX = 0
+CAMERA_INDEX = 2  # externe USB-Kamera (0=NVIDIA Broadcast, 1=Laptop-Webcam)
 
 # Common webcam resolutions to test (width, height)
 RESOLUTIONS = [

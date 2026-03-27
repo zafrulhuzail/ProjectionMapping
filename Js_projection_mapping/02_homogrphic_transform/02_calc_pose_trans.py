@@ -69,10 +69,10 @@ output_height=  720
 output_width = 1280
 
 
-cap = cv2.VideoCapture(0) # check if we want a different marker
+cap = cv2.VideoCapture(1) # je nach Rechner: 0/1/2 durchprobieren (z.B. 0=NVIDIA Broadcast)
 
 relative_cam_calibration_path = '../01_intrinsic_calibration/calibration/ProCamCalibration.pckl'
-bool_load_cam_calib= True
+bool_load_cam_calib= False  # True = mit Kamera-Kalibrierung (Phase 1), False = ueberspringen (fuer Top-Down-Setup ok)
 
 
 #------------------------------------------------------------------------------
@@ -163,10 +163,10 @@ while True:
         # Calc transfrom
         # ---------------------------------------------
         #if cv2.waitKey(1) & 0xFF == ord('h'):
-        if len(ids)==4:
-            print ("calc homography")
+        if all(mid in ids for mid in [0, 1, 2, 3]):
+            print("calc homography")
 
-            H= compute_homography_from_aruco   (ids, corners, output_width, output_height)
+            H = compute_homography_from_aruco(ids, corners, output_width, output_height)
 
             #[optional] save it using pickel:
             f = open('homographic_tranform.pckl', 'wb')

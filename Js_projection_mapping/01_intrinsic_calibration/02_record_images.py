@@ -7,7 +7,7 @@ print("Pleas get your ChAruco board ready -> either print it on you beamer/displ
 
 # ====== CONFIG ======
 save_dir = "./pictures/calibration_images"   # change this if you want another folder
-camera_index = 0              # 0 is default webcam
+camera_index = 2              # externe USB-Kamera (0=NVIDIA Broadcast, 1=Laptop-Webcam)
 # ====================
 
 # Create folder if it doesn't exist

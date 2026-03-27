@@ -86,17 +86,21 @@ Wenn die Kamera einen Marker an Position (300, 200) sieht, heisst das nicht, das
 |--------|-------------|
 | `01_marker_representation.py` | Erzeugt die vier Eck-Marker (ID 0-3) als Bilder zum Ausdrucken |
 | `02_calc_pose_trans.py` | Erkennt die vier Eck-Marker per Kamera, berechnet die Homographie-Matrix und speichert sie in pickle datei
-| `03_apply_transform_on_live_stream.py` | Zeigt das gewarpte Kamerabild live an (zur Ueberpruefung) |
+| `03_apply_transform_on_live_stream.py` | Zeigt das gewarpte Kamerabild live (Ueberpruefung): **Projektionsflaeche frontal/rechteckig** — wie der geplante Beamer-Inhalt „denkt“, nicht der echte Lichtkegel auf der Wand. |
 
 ### Ergebnis
 
-Die Transformation wird in einer **Pickle-Datei** gespeichert:
+Hier ist die **Homographie** gemeint: Sie bildet das **Kamerabild** in die **flache Projektionsflaeche** ab (Kamera-Pixel → „Beamer-/Wand-Raster“ mit fester Breite/Hoehe). Dein Code nutzt sie mit `warpPerspective`, damit erkannte Markerpositionen und spaeter gezeichneter Beamer-Inhalt **dieselbe logische Ebene** haben — nicht dass der Projektor die Pickle einliest.
+
+Sie wird in einer **Pickle-Datei** gespeichert:
 
 ```
 homographic_tranform.pckl
 ```
 
-Inhalt: `(H, output_width, output_height)` - Die Homographie-Matrix H und die Zielgroesse.
+Inhalt: `(H, output_width, output_height)` — Homographie-Matrix **H** und Zielgroesse.
+
+**Unterschied zu Ordner 1:** Dort liegt `ProCamCalibration.pckl` mit **Kameramodell** (Camera-Matrix, **Distortion**/Verzeichnung) — rein „wie die Linse die Welt verbiegt“. Ordner 2 speichert **H** — „wie Kamera-Blick und Beamer-/Wandflaeche zusammenpassen“. Beides wird oft nacheinander gebraucht: erst entzerren (Ordner 1), dann warpen (Ordner 2).
 
 **Das muss man nur neu machen**, wenn sich die Position von Kamera oder Beamer aendert.
 
