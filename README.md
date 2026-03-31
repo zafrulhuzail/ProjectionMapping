@@ -1,5 +1,7 @@
 # Beamer Projection Mapping
 
+![Projection mapping demo](docs/demo-pm.jfif)
+
 A projection-mapping workspace combining:
 
 - a baseline ArUco / homography pipeline (`Js_projection_mapping/`)
