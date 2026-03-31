@@ -1,0 +1,22 @@
+# Virtual environments
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Tooling
+.claude/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Model / run outputs
+runs/
+
+# Optional generated artifacts
+# Uncomment if you do not want to track recalculated calibration outputs
+# Js_projection_mapping/01_intrinsic_calibration/calibration/*.pckl
+# Js_projection_mapping/02_homogrphic_transform/*.pckl
